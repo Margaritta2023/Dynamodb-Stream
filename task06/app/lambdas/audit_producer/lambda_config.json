@@ -7,21 +7,28 @@
   "runtime": "nodejs20.x",
   "memory": 128,
   "timeout": 100,
-  "lambda_path": "lambdas/audit_producer",
-  "dependencies": [],
-  "event_sources": [
-    {
-      "resource_type": "dynamodb_trigger",
-      "target_table": "Configuration",
-      "batch_size": 123,
-      "function_response_types": ["ReportBatchItemFailures"]
-    }
-  ],
-  "env_variables": {
-    "table_name": {"target_table":"${target_table}" },
+  "lambda_path": "lambdas\\audit_producer",
+  "env_variables": {},
   "publish_version": false,
-  "alias": "learn",
-  "url_config": {},
-  "ephemeral_storage": 512
-}
+  "url_config": {
+    "auth_type": "NONE"
+  },
+  "ephemeral_storage": 512,
+  "dynamodb_trigger": {
+    "target_table" : "Configuration",
+    "batch_size" : 10
+  },
+  "dependencies" : [ 
+    {
+    "resource_name" : "Configuration",
+    "resource_type" : "dynamodb_table"
+    } 
+  ],
+  "event_sources" : [ 
+    {
+    "resource_type" : "dynamodb_trigger",
+    "target_table" : "Configuration",
+    "batch_size" : 10
+    }
+  ]
 }

@@ -14,7 +14,11 @@
             "dynamodb:DeleteItem",
             "ssm:PutParameter",
             "ssm:GetParameter",
-            "kms:Decrypt"
+            "kms:Decrypt",
+            "dynamodb:GetRecords",
+            "dynamodb:GetShardIterator",
+            "dynamodb:DescribeStream",
+            "dynamodb:ListStreams"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -23,25 +27,6 @@
       "Version": "2012-10-17"
     },
     "resource_type": "iam_policy"
-  },
-  "LambdaDynamoPolicy": {
-    "resource_type": "iam_policy",
-    "policy_content": {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Action": [
-            "dynamodb:PutItem",
-            "dynamodb:GetRecords", 
-            "dynamodb:GetShardIterator", 
-            "dynamodb:DescribeStream",
-            "dynamodb:ListStreams"
-          ],
-          "Resource": "*",
-          "Effect": "Allow"
-        }
-      ]
-    }
   },
   "Configuration": {
     "resource_type": "dynamodb_table",

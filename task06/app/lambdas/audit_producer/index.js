@@ -1,51 +1,60 @@
-const { v4: uuidv4 } = require("uuid");
-const AWS = require("aws-sdk");
+const AWS = require('aws-sdk');
+const { v4: uuidv4 } = require('uuid');
 
-const docClient = new AWS.DynamoDB.DocumentClient();
-const tableName = process.env.table_name;
+const dynamodb = new AWS.DynamoDB.DocumentClient();
 
-const getParams = (key, newValue, oldValue = undefined) => {
-  const createdAt = new Date();
-  return {
-    TableName: tableName,
-    Item: {
-      id: uuidv4(),
-      modificationTime: createdAt.toISOString(),
-      key,
-      updatedAttribute: "value",
-      ...(oldValue && { oldValue }),
-      newValue,
-    },
-  };
-};
+exports.handler = async (event, context) => {
+    const tableName = 'cmtr-712a8896-Audit-test';
 
-exports.handler = async (event) => {
+    for (const item of event.Records) {
+        if (!item) continue;
 
-  const eventRecord = event.Records[0];
-  if (!["MODIFY", "INSERT"].includes(eventRecord.eventName)) return;
+        const eventName = item.eventName;
+        const newImage = AWS.DynamoDB.Converter.unmarshall(item.dynamodb.NewImage);
+        const oldImage = item.dynamodb.OldImage ? AWS.DynamoDB.Converter.unmarshall(item.dynamodb.OldImage) : null;
 
-  const newItem = eventRecord.dynamodb.NewImage;
-  const newValue = parseInt(newItem.value.N);
-  const key = newItem.key.S;
+        if (eventName === 'INSERT') {
+            const itemKey = newImage.key || '';
+            const itemValue = newImage.value || '';
+            console.log('Item Key:', itemKey);
+            console.log('Item Value:', itemValue);
 
-  let params = {};
-  if (eventRecord.eventName === "MODIFY") {
-    const oldItem = eventRecord.dynamodb.OldImage;
-    const oldValue = parseInt(oldItem.value.N);
-    params = getParams(key, newValue, oldValue);
-  } else {
-    params = getParams(key, {
-      key: key,
-      value: newValue,
-    });
-  }
+            const item = {
+                id: uuidv4(),
+                itemKey: itemKey,
+                modificationTime: new Date().toISOString(),
+                newValue: {
+                    key: itemKey,
+                    value: itemValue
+                }
+            };
 
-  try {
-    await docClient.put(params).promise();
-    return true;
-  } catch (err) {
-    const parsedError = JSON.stringify(err, null, 2);
-    console.error(parsedError);
-    return parsedError;
-  }
+            await dynamodb.put({
+                TableName: tableName,
+                Item: item
+            }).promise();
+        } else if (eventName === 'MODIFY') {
+            const itemKey = newImage.key || '';
+            const newValue = newImage.value || '';
+            const oldValue = oldImage ? oldImage.value || '' : '';
+
+            const item = {
+                id: uuidv4(),
+                itemKey: itemKey,
+                modificationTime: new Date().toISOString(),
+                updatedAttribute: 'value',
+                oldValue: oldValue,
+                newValue: newValue
+            };
+
+            await dynamodb.put({
+                TableName: tableName,
+                Item: item
+            }).promise();
+        }
+
+        console.log('Processed record:', JSON.stringify(item));
+    }
+
+    return null;
 };
