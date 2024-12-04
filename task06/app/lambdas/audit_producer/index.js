@@ -1,58 +1,51 @@
-const AWS = require('aws-sdk');
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
+const { v4: uuidv4 } = require("uuid");
+const AWS = require("aws-sdk");
 
-const AUDIT_TABLE_NAME = 'cmtr-63edc6d2-Audit-test' || "Audit"; 
+const docClient = new AWS.DynamoDB.DocumentClient();
+const tableName = process.env.table_name;
 
-exports.handler = async (event) => {
-    try {
-        console.log('Stream Event:', JSON.stringify(event, null, 2));
-
-        
-        for (const record of event.Records) {
-            if (record.eventName === 'INSERT' || record.eventName === 'MODIFY' || record.eventName === 'REMOVE') {
-             
-                const auditEntry = createAuditEntry(record);
-
-              
-                await dynamoDB.put({
-                    TableName: AUDIT_TABLE_NAME,
-                    Item: auditEntry,
-                }).promise();
-
-                console.log('Audit entry stored:', auditEntry);
-            }
-        }
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Stream processed successfully' }),
-        };
-    } catch (error) {
-        console.error('Error processing stream:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: error.message }),
-        };
-    }
+const getParams = (key, newValue, oldValue = undefined) => {
+  const createdAt = new Date();
+  return {
+    TableName: tableName,
+    Item: {
+      id: uuidv4(),
+      modificationTime: createdAt.toISOString(),
+      key,
+      updatedAttribute: "value",
+      ...(oldValue && { oldValue }),
+      newValue,
+    },
+  };
 };
 
+exports.handler = async (event) => {
 
-function createAuditEntry(record) {
-    const timestamp = new Date().toISOString();
-    let auditEntry = {
-        id: `${record.eventID}-${timestamp}`, 
-        timestamp: timestamp,
-        eventType: record.eventName,
-    };
+  const eventRecord = event.Records[0];
+  if (!["MODIFY", "INSERT"].includes(eventRecord.eventName)) return;
 
-    if (record.dynamodb) {
-        if (record.dynamodb.NewImage) {
-            auditEntry.newImage = AWS.DynamoDB.Converter.unmarshall(record.dynamodb.NewImage);
-        }
-        if (record.dynamodb.OldImage) {
-            auditEntry.oldImage = AWS.DynamoDB.Converter.unmarshall(record.dynamodb.OldImage);
-        }
-    }
+  const newItem = eventRecord.dynamodb.NewImage;
+  const newValue = parseInt(newItem.value.N);
+  const key = newItem.key.S;
 
-    return auditEntry;
-}
+  let params = {};
+  if (eventRecord.eventName === "MODIFY") {
+    const oldItem = eventRecord.dynamodb.OldImage;
+    const oldValue = parseInt(oldItem.value.N);
+    params = getParams(key, newValue, oldValue);
+  } else {
+    params = getParams(key, {
+      key: key,
+      value: newValue,
+    });
+  }
+
+  try {
+    await docClient.put(params).promise();
+    return true;
+  } catch (err) {
+    const parsedError = JSON.stringify(err, null, 2);
+    console.error(parsedError);
+    return parsedError;
+  }
+};
