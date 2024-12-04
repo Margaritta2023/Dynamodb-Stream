@@ -20,7 +20,7 @@
   "env_variables": {
     "table_name": {"target_table":"${target_table}" },
   "publish_version": false,
-  "alias": "${lambdas_alias_name}",
+  "alias": "learn",
   "url_config": {},
   "ephemeral_storage": 512
 }
